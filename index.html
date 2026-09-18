@@ -3,273 +3,321 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>タスク管理アプリ</title>
-    <!-- Tailwind CSS CDN -->
+    <title>TaskFlow - Firebase タスクマネージャー</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
+                        sans: ['Plus Jakarta Sans', 'Noto Sans JP', 'sans-serif'],
+                    }
                 }
             }
         }
     </script>
     <style>
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+        .animate-fade-in {
+            animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
     </style>
 </head>
-<body class="h-full text-slate-800 flex flex-col font-sans antialiased">
+<body class="h-full font-sans text-slate-800 antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md">
-                    <i class="fa-solid fa-check-double text-xl"></i>
+    <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-200">
+                    <i class="fa-solid fa-check-double text-lg"></i>
                 </div>
-                <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                    TaskFlow
-                </h1>
+                <div>
+                    <h1 class="font-extrabold text-slate-900 text-lg leading-tight tracking-tight">TaskFlow</h1>
+                    <p class="text-[11px] text-slate-500 font-medium hidden sm:block">Firebase リアルタイム同期タスク管理</p>
+                </div>
             </div>
 
-            <!-- User Auth State Area -->
-            <div id="userProfile" class="flex items-center space-x-3">
-                <div id="loadingAuth" class="flex items-center space-x-2 text-slate-400 text-sm">
-                    <i class="fa-solid fa-circle-notch animate-spin"></i>
-                    <span>読み込み中...</span>
+            <!-- User Auth Status Area -->
+            <div id="authArea" class="flex items-center gap-3">
+                <div id="authLoading" class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full bg-slate-200 animate-pulse"></div>
+                    <div class="w-20 h-4 bg-slate-200 rounded animate-pulse hidden sm:block"></div>
+                </div>
+
+                <!-- Logged In View -->
+                <div id="userProfile" class="hidden flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-200 shadow-sm overflow-hidden" id="userAvatarContainer">
+                        <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover hidden">
+                        <span id="userInitial">U</span>
+                    </div>
+                    <div class="flex flex-col hidden sm:flex">
+                        <span id="userName" class="text-xs font-bold text-slate-800 truncate max-w-[130px]">ユーザー</span>
+                        <span id="userBadge" class="text-[10px] text-indigo-600 font-semibold">アカウント連携済</span>
+                    </div>
+                    <button id="logoutBtn" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="hidden sm:inline">ログアウト</span>
+                    </button>
+                </div>
+
+                <!-- Logged Out View Buttons -->
+                <div id="loggedOutBtns" class="hidden flex items-center gap-2">
+                    <button id="googleLoginBtn" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                        <i class="fa-brands fa-google text-sm"></i>
+                        <span>Googleログイン</span>
+                    </button>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        <!-- Login View (Shown when logged out) -->
-        <div id="loginView" class="hidden flex flex-col items-center justify-center py-16 text-center">
-            <div class="bg-indigo-50 p-6 rounded-full text-indigo-600 mb-6 shadow-inner">
-                <i class="fa-solid fa-tasks text-5xl"></i>
+        <!-- Welcome / Landing View -->
+        <div id="loginPrompt" class="hidden text-center py-16 bg-white rounded-3xl border border-slate-200/80 shadow-sm my-4 p-6 sm:p-12 animate-fade-in">
+            <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner">
+                <i class="fa-solid fa-list-check"></i>
             </div>
-            <h2 class="text-3xl font-extrabold text-slate-900 mb-3">スマートにタスクを管理しよう</h2>
-            <p class="text-slate-600 max-w-md mb-8 leading-relaxed">
-                Googleアカウントでログインすると、どこからでもリアルタイムにタスクを同期・編集・管理できます。
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">タスクを整理して、今日をはじめよう</h2>
+            <p class="text-slate-500 max-w-lg mx-auto mb-8 text-sm sm:text-base leading-relaxed">
+                Googleアカウントでログインすると、Firestore経由でスマホやPCなどの複数デバイス間でタスクがリアルタイム同期されます。
             </p>
-            <button id="googleLoginBtn" class="flex items-center justify-center space-x-3 bg-white text-slate-700 border border-slate-300 hover:border-slate-400 px-6 py-3.5 rounded-xl font-semibold shadow-sm hover:shadow transition-all duration-200 group active:scale-95">
-                <svg class="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Googleでログイン</span>
-            </button>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                <button id="heroLoginBtn" class="w-full sm:w-auto px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-semibold shadow-lg shadow-indigo-200 transition-all inline-flex items-center justify-center gap-3">
+                    <i class="fa-brands fa-google text-lg"></i>
+                    <span>Googleでログインして始める</span>
+                </button>
+                <button id="anonLoginBtn" class="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-xl font-semibold transition-all inline-flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-ninja"></i>
+                    <span>ゲストとして試す</span>
+                </button>
+            </div>
         </div>
 
-        <!-- App Dashboard View (Shown when logged in) -->
-        <div id="appDashboard" class="hidden space-y-6">
+        <div id="appView" class="hidden space-y-8 animate-fade-in">
             
-            <!-- Task Creation Form -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 transition-all hover:shadow-md">
-                <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center space-x-2">
-                    <i class="fa-solid fa-plus-circle text-indigo-600"></i>
-                    <span>新しいタスクを追加</span>
-                </h3>
-                <form id="addTaskForm" class="space-y-4">
-                    <div>
-                        <input type="text" id="taskTitle" required placeholder="タスクのタイトルを入力..." 
-                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 placeholder-slate-400 text-sm transition">
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">全タスク</p>
+                    <p id="statTotal" class="text-2xl sm:text-3xl font-extrabold text-slate-800">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <p class="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">未完了</p>
+                    <p id="statPending" class="text-2xl sm:text-3xl font-extrabold text-amber-600">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <p class="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">完了済み</p>
+                    <p id="statCompleted" class="text-2xl sm:text-3xl font-extrabold text-emerald-600">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                    <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-1">達成率</p>
+                    <div class="flex items-end justify-between">
+                        <span id="statRate" class="text-2xl sm:text-3xl font-extrabold text-indigo-600">0%</span>
+                        <div class="w-16 bg-slate-100 rounded-full h-2 overflow-hidden mb-2">
+                            <div id="statProgressBar" class="bg-indigo-600 h-full w-0 transition-all duration-500"></div>
+                        </div>
                     </div>
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
+                </div>
+            </div>
+
+            <!-- Task Creation Form -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 sm:p-6">
+                <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-plus text-indigo-600"></i>
+                    <span>新しいタスクを追加</span>
+                </h2>
+                <form id="addTaskForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">タスク名 *</label>
+                            <input type="text" id="taskTitle" required placeholder="例: 企画書の作成、買い出し..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">期限日</label>
+                            <input type="date" id="taskDueDate" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
+                        </div>
+                        <div class="md:col-span-3">
                             <label class="block text-xs font-medium text-slate-500 mb-1">優先度</label>
-                            <select id="taskPriority" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="low">低 (Low)</option>
-                                <option value="medium" selected>中 (Medium)</option>
-                                <option value="high">高 (High)</option>
+                            <select id="taskPriority" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
+                                <option value="low">優先度: 低 🔵</option>
+                                <option value="medium" selected>優先度: 中 🟡</option>
+                                <option value="high">優先度: 高 🔴</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-1">期限日</label>
-                            <input type="date" id="taskDueDate" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">カテゴリー / タグ</label>
+                            <input type="text" id="taskCategory" placeholder="例: 仕事, 個人, 買い物" class="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-1">カテゴリー</label>
-                            <input type="text" id="taskCategory" placeholder="例: 仕事, 勉強" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">詳細メモ (任意)</label>
+                            <input type="text" id="taskDescription" placeholder="補足説明やURLなど..." class="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                         </div>
                     </div>
 
-                    <div class="flex justify-end pt-2">
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-xl text-sm transition duration-200 shadow-sm flex items-center space-x-2 active:scale-95">
-                            <i class="fa-solid fa-paper-plane text-xs"></i>
-                            <span>タスクを作成</span>
+                    <div class="flex items-center justify-between pt-1">
+                        <div class="flex gap-2">
+                            <button type="button" id="quickTodayBtn" class="px-2.5 py-1 text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-600 transition-colors">今日</button>
+                            <button type="button" id="quickTomorrowBtn" class="px-2.5 py-1 text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-600 transition-colors">明日</button>
+                        </div>
+                        <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>タスクを登録</span>
                         </button>
                     </div>
                 </form>
             </div>
 
-            <!-- Filter & Stats Bar -->
-            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                
-                <!-- Filter Tabs -->
-                <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs font-medium w-full sm:w-auto">
-                    <button data-filter="all" class="filter-btn active flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition">すべて</button>
-                    <button data-filter="pending" class="filter-btn flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition">未完了</button>
-                    <button data-filter="completed" class="filter-btn flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition">完了済み</button>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-100/80 p-2.5 rounded-2xl">
+                <!-- Status Filter Tabs -->
+                <div class="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-200/60 overflow-x-auto">
+                    <button class="filter-tab active px-3.5 py-1.5 text-xs font-semibold rounded-lg text-indigo-600 bg-indigo-50 transition-all whitespace-nowrap" data-filter="all">すべて</button>
+                    <button class="filter-tab px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition-all whitespace-nowrap" data-filter="active">未完了</button>
+                    <button class="filter-tab px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition-all whitespace-nowrap" data-filter="completed">完了済み</button>
                 </div>
 
-                <!-- Search Input -->
-                <div class="relative w-full sm:w-64">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="searchInput" placeholder="タスクを検索..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-            </div>
-
-            <!-- Task List -->
-            <div id="taskList" class="space-y-3 min-h-[200px]">
-                <!-- Skeleton Loading Placeholder -->
-                <div class="animate-pulse bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between">
-                    <div class="flex items-center space-x-3 w-2/3">
-                        <div class="w-5 h-5 bg-slate-200 rounded"></div>
-                        <div class="h-4 bg-slate-200 rounded w-full"></div>
+                <div class="flex items-center gap-2 flex-1 sm:max-w-md">
+                    <!-- Search Input -->
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="searchInput" placeholder="タイトルやタグで検索..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                     </div>
-                    <div class="w-16 h-4 bg-slate-200 rounded"></div>
+                    <!-- Sort Selector -->
+                    <select id="sortSelect" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        <option value="created_desc">作成日時 (新しい順)</option>
+                        <option value="due_asc">期限日 (近い順)</option>
+                        <option value="priority_high">優先度 (高い順)</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Empty State -->
-            <div id="emptyState" class="hidden flex flex-col items-center justify-center py-12 text-center bg-white rounded-xl border border-dashed border-slate-300">
-                <i class="fa-regular fa-clipboard text-4xl text-slate-300 mb-3"></i>
-                <p class="text-slate-500 font-medium text-sm">該当するタスクがありません</p>
-                <p class="text-slate-400 text-xs mt-1">新しいタスクを追加してください</p>
+            <!-- Task Item List Container -->
+            <div id="taskList" class="space-y-3"></div>
+
+            <!-- Empty State View -->
+            <div id="emptyState" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+                <i class="fa-regular fa-clipboard text-4xl text-slate-300 mb-3 block"></i>
+                <p class="text-slate-600 font-medium text-sm">該当するタスクが見つかりませんでした</p>
+                <p class="text-xs text-slate-400 mt-1">上のフォームから新しくタスクを追加してください。</p>
             </div>
         </div>
     </main>
 
     <!-- Edit Task Modal -->
-    <div id="editModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200 px-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 transform scale-95 transition-transform duration-200" id="editModalCard">
-            <h3 class="text-lg font-bold text-slate-800 mb-4">タスクを編集</h3>
+    <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 animate-fade-in">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
+                    <span>タスクの編集</span>
+                </h3>
+                <button id="closeEditModalBtn" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
             <form id="editTaskForm" class="space-y-4">
                 <input type="hidden" id="editTaskId">
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">タイトル</label>
-                    <input type="text" id="editTaskTitle" required class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500">
+                    <label class="block text-xs font-medium text-slate-500 mb-1">タスク名</label>
+                    <input type="text" id="editTaskTitle" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">優先度</label>
-                        <select id="editTaskPriority" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500">
-                            <option value="low">低</option>
-                            <option value="medium">中</option>
-                            <option value="high">高</option>
-                        </select>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">期限日</label>
+                        <input type="date" id="editTaskDueDate" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">期限日</label>
-                        <input type="date" id="editTaskDueDate" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                        <label class="block text-xs font-medium text-slate-500 mb-1">優先度</label>
+                        <select id="editTaskPriority" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none">
+                            <option value="low">低 🔵</option>
+                            <option value="medium">中 🟡</option>
+                            <option value="high">高 🔴</option>
+                        </select>
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 mb-1">カテゴリー</label>
-                    <input type="text" id="editTaskCategory" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="editTaskCategory" class="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none">
                 </div>
-                <div class="flex justify-end space-x-2 pt-3">
-                    <button type="button" id="closeEditModalBtn" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50">キャンセル</button>
-                    <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium">更新を保存</button>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">メモ</label>
+                    <textarea id="editTaskDescription" rows="3" class="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="cancelEditBtn" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">キャンセル</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors">変更を保存</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Custom Delete Modal -->
-    <div id="deleteModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200 px-4">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 text-center">
-            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fa-solid fa-trash-can text-xl"></i>
+    <!-- Error Modal for GitHub Pages Authorized Domain setup -->
+    <div id="errorModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4 animate-fade-in">
+            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
-            <h3 class="text-base font-bold text-slate-800 mb-2">タスクを削除しますか？</h3>
-            <p class="text-xs text-slate-500 mb-6">この操作は取り消せません。</p>
-            <div class="flex justify-center space-x-3">
-                <button id="cancelDeleteBtn" class="w-full py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50">キャンセル</button>
-                <button id="confirmDeleteBtn" class="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium">削除する</button>
+            <h3 class="text-base font-bold text-slate-900">Googleログインのエラー（ドメイン未承認）</h3>
+            <p id="modalErrorMessage" class="text-xs text-slate-600 leading-relaxed"></p>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                <p class="font-bold text-slate-800">【解決手順】</p>
+                <ol class="list-decimal list-inside text-slate-600 space-y-1.5">
+                    <li><a href="https://console.firebase.google.com/" target="_blank" class="text-indigo-600 underline font-semibold">Firebase Console</a> にアクセス</li>
+                    <li>プロジェクト <strong class="text-slate-800">task-49206</strong> を選択</li>
+                    <li>Authentication &gt; 設定 &gt; 承認済みドメイン</li>
+                    <li>現在のドメイン（<span id="currentHost" class="font-mono text-indigo-600 font-bold"></span>）を追加</li>
+                </ol>
             </div>
-        </div>
-    </div>
-
-    <!-- Auth Error Guidance Modal -->
-    <div id="authErrorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200 px-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100">
-            <div class="flex items-center space-x-3 text-rose-600 mb-4">
-                <div class="p-2.5 bg-rose-100 rounded-xl">
-                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
-                </div>
-                <div>
-                    <h3 class="text-base font-bold text-slate-800">ログインエラーが発生しました</h3>
-                    <p id="authErrorCode" class="text-xs font-mono text-rose-600 mt-0.5"></p>
-                </div>
-            </div>
-            
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-3 mb-5">
-                <p id="authErrorMessage" class="font-medium text-slate-800"></p>
-                <div id="authErrorSolution" class="space-y-2 pt-2 border-t border-slate-200">
-                    <!-- Dynamic resolution steps -->
-                </div>
-            </div>
-
-            <div class="flex justify-end space-x-2">
-                <button id="closeAuthErrorBtn" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium transition">
-                    閉じる
-                </button>
+            <div class="flex gap-2 pt-2">
+                <button id="closeModalBtn" class="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition-colors">閉じる</button>
+                <button id="modalAnonBtn" class="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors">ゲストログインで動かす</button>
             </div>
         </div>
     </div>
 
     <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- Firebase SDK Modular Import -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
             GoogleAuthProvider, 
             signInWithPopup, 
+            signInAnonymously,
+            signInWithCustomToken,
             signOut, 
             onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
             collection, 
-            addDoc, 
             doc, 
+            addDoc, 
             updateDoc, 
             deleteDoc, 
-            onSnapshot, 
-            serverTimestamp 
+            onSnapshot 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // User's Firebase Configuration
-        const firebaseConfig = {
+        const userProvidedConfig = {
             apiKey: "AIzaSyBm5V2bv3b7AlVlo48oxOPl9Z-Be16-75Y",
             authDomain: "task-49206.firebaseapp.com",
             projectId: "task-49206",
@@ -278,453 +326,458 @@
             appId: "1:330372786511:web:0bde70f01c378ff54bbd3a"
         };
 
-        // Initialize Firebase
+        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) 
+            ? JSON.parse(__firebase_config) 
+            : userProvidedConfig;
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
 
-        // State Management
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-49206';
         let currentUser = null;
         let tasks = [];
-        let unsubscribeTasks = null;
         let currentFilter = 'all';
         let searchQuery = '';
-        let taskToDeleteId = null;
+        let currentSort = 'created_desc';
+        let unsubscribeTasks = null;
 
-        // DOM Elements
-        const userProfileEl = document.getElementById('userProfile');
-        const loginViewEl = document.getElementById('loginView');
-        const appDashboardEl = document.getElementById('appDashboard');
+        const authLoading = document.getElementById('authLoading');
+        const userProfile = document.getElementById('userProfile');
+        const userAvatarContainer = document.getElementById('userAvatarContainer');
+        const userAvatar = document.getElementById('userAvatar');
+        const userInitial = document.getElementById('userInitial');
+        const userName = document.getElementById('userName');
+        const userBadge = document.getElementById('userBadge');
+        const loggedOutBtns = document.getElementById('loggedOutBtns');
         const googleLoginBtn = document.getElementById('googleLoginBtn');
+        const heroLoginBtn = document.getElementById('heroLoginBtn');
+        const anonLoginBtn = document.getElementById('anonLoginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginPrompt = document.getElementById('loginPrompt');
+        const appView = document.getElementById('appView');
         const addTaskForm = document.getElementById('addTaskForm');
-        const taskListEl = document.getElementById('taskList');
-        const emptyStateEl = document.getElementById('emptyState');
+        const taskList = document.getElementById('taskList');
+        const emptyState = document.getElementById('emptyState');
         const searchInput = document.getElementById('searchInput');
-        const filterBtns = document.querySelectorAll('.filter-btn');
+        const sortSelect = document.getElementById('sortSelect');
 
-        // Toast Notification System
+        const errorModal = document.getElementById('errorModal');
+        const modalErrorMessage = document.getElementById('modalErrorMessage');
+        const currentHostSpan = document.getElementById('currentHost');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalAnonBtn = document.getElementById('modalAnonBtn');
+
+        const editModal = document.getElementById('editModal');
+        const editTaskForm = document.getElementById('editTaskForm');
+        const closeEditModalBtn = document.getElementById('closeEditModalBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+
         function showToast(message, type = 'info') {
-            const toastContainer = document.getElementById('toastContainer');
+            const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
-            
-            const bgColors = {
+            const colors = {
                 success: 'bg-emerald-600 text-white',
                 error: 'bg-rose-600 text-white',
                 info: 'bg-slate-800 text-white'
             };
-
-            toast.className = `${bgColors[type] || bgColors.info} px-4 py-3 rounded-xl shadow-lg text-xs font-medium flex items-center space-x-2 transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto`;
-            toast.innerHTML = `<span>${message}</span>`;
             
-            toastContainer.appendChild(toast);
-
-            // Animate in
-            setTimeout(() => {
+            toast.className = `px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 transition-all transform translate-y-2 opacity-0 pointer-events-auto ${colors[type] || colors.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info'}"></i>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
                 toast.classList.remove('translate-y-2', 'opacity-0');
-            }, 10);
-
-            // Remove after 3 seconds
+            });
+            
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-y-2');
                 setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            }, 3500);
         }
 
-        // Google Authentication Logic
-        googleLoginBtn.addEventListener('click', async () => {
-            const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-                showToast('ログインしました', 'success');
-            } catch (error) {
-                console.error("Login failed:", error);
-                handleAuthError(error);
+        async function initAuth() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (e) {
+                    console.warn("Custom token auth failed, falling back:", e);
+                }
             }
-        });
-
-        // Detailed Auth Error Handler
-        function handleAuthError(error) {
-            const modal = document.getElementById('authErrorModal');
-            const codeEl = document.getElementById('authErrorCode');
-            const msgEl = document.getElementById('authErrorMessage');
-            const solutionEl = document.getElementById('authErrorSolution');
-
-            const currentDomain = window.location.hostname || '現在のドメイン';
-            codeEl.textContent = error.code || 'UNKNOWN_ERROR';
-
-            let message = 'Googleログインに失敗しました。';
-            let steps = [];
-
-            switch (error.code) {
-                case 'auth/unauthorized-domain':
-                    message = '現在のドメインがFirebase認証で許可されていません。';
-                    steps = [
-                        `1. <a href="https://console.firebase.google.com/" target="_blank" class="text-indigo-600 underline font-medium">Firebase Console</a> を開く`,
-                        `2. <strong>Authentication</strong> &gt; <strong>設定</strong> &gt; <strong>承認済みドメイン</strong> を開く`,
-                        `3. 「ドメインの追加」をクリックし、 <code class="bg-slate-200 px-1.5 py-0.5 rounded font-mono font-bold text-indigo-700">${currentDomain}</code> を追加してください`
-                    ];
-                    break;
-                case 'auth/operation-not-allowed':
-                    message = 'Google ログインプロバイダが有効になっていません。';
-                    steps = [
-                        `1. <a href="https://console.firebase.google.com/" target="_blank" class="text-indigo-600 underline font-medium">Firebase Console</a> を開く`,
-                        `2. <strong>Authentication</strong> &gt; <strong>Sign-in method</strong> を開く`,
-                        `3. 「Google」を選択して「有効にする」をONにして保存してください`
-                    ];
-                    break;
-                case 'auth/popup-blocked':
-                    message = 'ブラウザでポップアップがブロックされました。';
-                    steps = [
-                        `1. アドレスバー右端のポップアップブロックアイコンを確認`,
-                        `2. 「このサイトのポップアップを常に許可」を選択して再試行してください`
-                    ];
-                    break;
-                case 'auth/popup-closed-by-user':
-                    message = 'ログインウィンドウが途中で閉じられました。';
-                    steps = [`もう一度「Googleでログイン」ボタンを押してログインを完了させてください。`];
-                    break;
-                default:
-                    message = error.message || '予期せぬエラーが発生しました。';
-                    steps = [`設定（API KeyやApp IDなど）が正しいかご確認ください。`];
-                    break;
-            }
-
-            msgEl.textContent = message;
-            solutionEl.innerHTML = `
-                <p class="font-semibold text-slate-800">【解決手順】</p>
-                <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
-                    ${steps.map(s => `<li>${s}</li>`).join('')}
-                </ul>
-            `;
-
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.remove('opacity-0'), 10);
         }
+        initAuth();
 
-        document.getElementById('closeAuthErrorBtn').addEventListener('click', () => {
-            const modal = document.getElementById('authErrorModal');
-            modal.classList.add('opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 200);
-        });
-
-        // Logout Event Delegate
-        window.handleLogout = async () => {
-            try {
-                if (unsubscribeTasks) unsubscribeTasks();
-                await signOut(auth);
-                showToast('ログアウトしました', 'info');
-            } catch (error) {
-                showToast('ログアウト時にエラーが発生しました', 'error');
-            }
-        };
-
-        // Auth State Observer
         onAuthStateChanged(auth, (user) => {
+            authLoading.classList.add('hidden');
             currentUser = user;
+
             if (user) {
-                renderUserProfile(user);
-                loginViewEl.classList.add('hidden');
-                appDashboardEl.classList.remove('hidden');
+                // User is authenticated
+                loggedOutBtns.classList.add('hidden');
+                loginPrompt.classList.add('hidden');
+                userProfile.classList.remove('hidden');
+                appView.classList.remove('hidden');
+
+                if (user.isAnonymous) {
+                    userName.textContent = "ゲストユーザー";
+                    userBadge.textContent = "一時ログイン";
+                    userInitial.textContent = "G";
+                    userAvatar.classList.add('hidden');
+                    userInitial.classList.remove('hidden');
+                } else {
+                    userName.textContent = user.displayName || user.email || "ユーザー";
+                    userBadge.textContent = "Google連携済";
+                    if (user.photoURL) {
+                        userAvatar.src = user.photoURL;
+                        userAvatar.classList.remove('hidden');
+                        userInitial.classList.add('hidden');
+                    } else {
+                        userInitial.textContent = (user.displayName || "U").charAt(0).toUpperCase();
+                        userAvatar.classList.add('hidden');
+                        userInitial.classList.remove('hidden');
+                    }
+                }
+
+                // Subscribe to tasks
                 subscribeToTasks(user.uid);
             } else {
-                renderLoggedOutProfile();
-                appDashboardEl.classList.add('hidden');
-                loginViewEl.classList.remove('hidden');
+                // User is signed out
+                if (unsubscribeTasks) unsubscribeTasks();
                 tasks = [];
+                userProfile.classList.add('hidden');
+                appView.classList.add('hidden');
+                loggedOutBtns.classList.remove('hidden');
+                loginPrompt.classList.remove('hidden');
             }
         });
 
-        // Render User Header Profile
-        function renderUserProfile(user) {
-            userProfileEl.innerHTML = `
-                <div class="flex items-center space-x-3">
-                    <img src="${user.photoURL || 'https://via.placeholder.com/40'}" alt="${user.displayName}" class="w-8 h-8 rounded-full ring-2 ring-indigo-500/30">
-                    <span class="text-sm font-medium text-slate-700 hidden sm:inline">${user.displayName || 'ユーザー'}</span>
-                    <button onclick="handleLogout()" class="text-xs text-slate-500 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition font-medium">
-                        <i class="fa-solid fa-right-from-bracket mr-1"></i>ログアウト
-                    </button>
-                </div>
-            `;
+        async function loginWithGoogle() {
+            try {
+                await signInWithPopup(auth, googleProvider);
+                showToast("Googleアカウントでログインしました", "success");
+            } catch (error) {
+                console.error("Login error:", error);
+                if (error.code === 'auth/unauthorized-domain') {
+                    currentHostSpan.textContent = window.location.hostname || '現在アクセス中のドメイン';
+                    modalErrorMessage.textContent = `「${window.location.hostname}」からのログインリクエストがFirebaseによりブロックされました。Firebase Consoleでこのドメインを許可してください。`;
+                    errorModal.classList.remove('hidden');
+                } else if (error.code === 'auth/popup-blocked') {
+                    showToast("ポップアップがブロックされました。ブラウザの許可設定をご確認ください。", "error");
+                } else {
+                    showToast("ログイン処理中にエラーが発生しました: " + error.message, "error");
+                }
+            }
         }
 
-        function renderLoggedOutProfile() {
-            userProfileEl.innerHTML = `
-                <span class="text-xs text-slate-400">未認証</span>
-            `;
+        async function loginAnonymously() {
+            try {
+                await signInAnonymously(auth);
+                showToast("ゲストとしてログインしました", "success");
+                errorModal.classList.add('hidden');
+            } catch (error) {
+                console.error("Anonymous auth error:", error);
+                showToast("ゲストログインに失敗しました", "error");
+            }
         }
 
-        // Firestore Real-time Listener Rule
-        // Standard path constraint: /artifacts/{appId}/users/{userId}/{collectionName}
+        googleLoginBtn.addEventListener('click', loginWithGoogle);
+        heroLoginBtn.addEventListener('click', loginWithGoogle);
+        anonLoginBtn.addEventListener('click', loginAnonymously);
+        modalAnonBtn.addEventListener('click', loginAnonymously);
+        closeModalBtn.addEventListener('click', () => errorModal.classList.add('hidden'));
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showToast("ログアウトしました", "info");
+            } catch (error) {
+                showToast("ログアウト中にエラーが発生しました", "error");
+            }
+        });
+
+        function getTasksCollectionRef(userId) {
+            // Firestore Rule 1: /artifacts/{appId}/users/{userId}/{collectionName}
+            return collection(db, 'artifacts', appId, 'users', userId, 'tasks');
+        }
+
         function subscribeToTasks(userId) {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-49206';
-            const tasksCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'tasks');
-
             if (unsubscribeTasks) unsubscribeTasks();
 
-            unsubscribeTasks = onSnapshot(tasksCollectionRef, (snapshot) => {
-                tasks = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                
-                // Client-side Sort (CreatedAt descending)
-                tasks.sort((a, b) => {
-                    const timeA = a.createdAt?.seconds || 0;
-                    const timeB = b.createdAt?.seconds || 0;
-                    return timeB - timeA;
+            const colRef = getTasksCollectionRef(userId);
+            unsubscribeTasks = onSnapshot(colRef, (snapshot) => {
+                const loaded = [];
+                snapshot.forEach((docSnap) => {
+                    loaded.push({ id: docSnap.id, ...docSnap.data() });
                 });
-
-                renderTasks();
+                tasks = loaded;
+                renderApp();
             }, (error) => {
-                console.error("Firestore subscription error:", error);
-                showToast('タスクの取得中にエラーが発生しました', 'error');
+                console.error("Firestore snapshot error:", error);
+                showToast("データの読み込みに失敗しました", "error");
             });
         }
 
-        // Add Task Logic
+        // Add task
         addTaskForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentUser) return;
 
             const title = document.getElementById('taskTitle').value.trim();
-            const priority = document.getElementById('taskPriority').value;
             const dueDate = document.getElementById('taskDueDate').value;
+            const priority = document.getElementById('taskPriority').value;
             const category = document.getElementById('taskCategory').value.trim();
+            const description = document.getElementById('taskDescription').value.trim();
 
             if (!title) return;
 
             try {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-49206';
-                const tasksCollectionRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks');
-                
-                await addDoc(tasksCollectionRef, {
+                const colRef = getTasksCollectionRef(currentUser.uid);
+                await addDoc(colRef, {
                     title,
-                    priority,
-                    dueDate,
-                    category,
+                    dueDate: dueDate || null,
+                    priority: priority || 'medium',
+                    category: category || '',
+                    description: description || '',
                     completed: false,
-                    createdAt: serverTimestamp()
+                    createdAt: new Date().toISOString()
                 });
 
                 addTaskForm.reset();
-                showToast('タスクを追加しました', 'success');
+                showToast("新しいタスクを追加しました！", "success");
             } catch (error) {
                 console.error("Error adding task:", error);
-                showToast('タスクの追加に失敗しました', 'error');
+                showToast("タスクの追加に失敗しました", "error");
             }
         });
 
-        // Toggle Task Completion
-        window.toggleTaskComplete = async (taskId, currentStatus) => {
+        // Quick date buttons
+        document.getElementById('quickTodayBtn').addEventListener('click', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('taskDueDate').value = today;
+        });
+        document.getElementById('quickTomorrowBtn').addEventListener('click', () => {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('taskDueDate').value = tomorrow.toISOString().split('T')[0];
+        });
+
+        // Toggle Complete
+        window.toggleTaskComplete = async function(taskId, currentStatus) {
             if (!currentUser) return;
             try {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-49206';
-                const taskDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', taskId);
-                
-                await updateDoc(taskDocRef, {
-                    completed: !currentStatus
+                const taskRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', taskId);
+                await updateDoc(taskRef, {
+                    completed: !currentStatus,
+                    updatedAt: new Date().toISOString()
                 });
             } catch (error) {
-                showToast('ステータスの更新に失敗しました', 'error');
+                console.error("Error updating task status:", error);
+                showToast("ステータス更新に失敗しました", "error");
             }
         };
 
-        // Delete Task Dialog Flow
-        window.promptDeleteTask = (taskId) => {
-            taskToDeleteId = taskId;
-            const deleteModal = document.getElementById('deleteModal');
-            deleteModal.classList.remove('hidden');
-            setTimeout(() => deleteModal.classList.remove('opacity-0'), 10);
-        };
-
-        document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
-            closeDeleteModal();
-        });
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
-            if (!taskToDeleteId || !currentUser) return;
+        // Delete Task
+        window.deleteTask = async function(taskId) {
+            if (!currentUser) return;
             try {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-49206';
-                const taskDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', taskToDeleteId);
-                await deleteDoc(taskDocRef);
-                showToast('タスクを削除しました', 'info');
+                const taskRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', taskId);
+                await deleteDoc(taskRef);
+                showToast("タスクを削除しました", "info");
             } catch (error) {
-                showToast('削除に失敗しました', 'error');
-            } finally {
-                closeDeleteModal();
+                console.error("Error deleting task:", error);
+                showToast("削除に失敗しました", "error");
             }
-        });
-
-        function closeDeleteModal() {
-            const deleteModal = document.getElementById('deleteModal');
-            deleteModal.classList.add('opacity-0');
-            setTimeout(() => {
-                deleteModal.classList.add('hidden');
-                taskToDeleteId = null;
-            }, 200);
-        }
+        };
 
         // Edit Task Modal Functions
-        window.openEditModal = (taskId) => {
+        window.openEditModal = function(taskId) {
             const task = tasks.find(t => t.id === taskId);
             if (!task) return;
 
             document.getElementById('editTaskId').value = task.id;
             document.getElementById('editTaskTitle').value = task.title || '';
-            document.getElementById('editTaskPriority').value = task.priority || 'medium';
             document.getElementById('editTaskDueDate').value = task.dueDate || '';
+            document.getElementById('editTaskPriority').value = task.priority || 'medium';
             document.getElementById('editTaskCategory').value = task.category || '';
+            document.getElementById('editTaskDescription').value = task.description || '';
 
-            const editModal = document.getElementById('editModal');
             editModal.classList.remove('hidden');
-            setTimeout(() => {
-                editModal.classList.remove('opacity-0');
-                document.getElementById('editModalCard').classList.remove('scale-95');
-            }, 10);
         };
 
-        function closeEditModal() {
-            const editModal = document.getElementById('editModal');
-            document.getElementById('editModalCard').classList.add('scale-95');
-            editModal.classList.add('opacity-0');
-            setTimeout(() => {
-                editModal.classList.add('hidden');
-            }, 200);
-        }
+        closeEditModalBtn.addEventListener('click', () => editModal.classList.add('hidden'));
+        cancelEditBtn.addEventListener('click', () => editModal.classList.add('hidden'));
 
-        document.getElementById('closeEditModalBtn').addEventListener('click', closeEditModal);
-
-        document.getElementById('editTaskForm').addEventListener('submit', async (e) => {
+        editTaskForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentUser) return;
 
-            const id = document.getElementById('editTaskId').value;
+            const taskId = document.getElementById('editTaskId').value;
             const title = document.getElementById('editTaskTitle').value.trim();
-            const priority = document.getElementById('editTaskPriority').value;
             const dueDate = document.getElementById('editTaskDueDate').value;
+            const priority = document.getElementById('editTaskPriority').value;
             const category = document.getElementById('editTaskCategory').value.trim();
+            const description = document.getElementById('editTaskDescription').value.trim();
 
             try {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-49206';
-                const taskDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', id);
-
-                await updateDoc(taskDocRef, {
+                const taskRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', taskId);
+                await updateDoc(taskRef, {
                     title,
+                    dueDate: dueDate || null,
                     priority,
-                    dueDate,
-                    category
+                    category,
+                    description,
+                    updatedAt: new Date().toISOString()
                 });
-
-                showToast('タスクを更新しました', 'success');
-                closeEditModal();
+                editModal.classList.add('hidden');
+                showToast("タスクを修正しました", "success");
             } catch (error) {
-                showToast('更新に失敗しました', 'error');
+                console.error("Error updating task:", error);
+                showToast("更新に失敗しました", "error");
             }
         });
 
-        // Filter Buttons Switcher
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                filterBtns.forEach(b => {
-                    b.classList.remove('active', 'bg-white', 'text-indigo-600', 'shadow-sm');
-                    b.classList.add('text-slate-600');
+        // Filter tabs listener
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-tab').forEach(t => {
+                    t.classList.remove('active', 'text-indigo-600', 'bg-indigo-50');
+                    t.classList.add('text-slate-600');
                 });
-                
-                const target = e.target;
-                target.classList.add('active', 'bg-white', 'text-indigo-600', 'shadow-sm');
-                target.classList.remove('text-slate-600');
-
-                currentFilter = target.getAttribute('data-filter');
-                renderTasks();
+                e.target.classList.add('active', 'text-indigo-600', 'bg-indigo-50');
+                e.target.classList.remove('text-slate-600');
+                currentFilter = e.target.getAttribute('data-filter');
+                renderApp();
             });
         });
 
-        // Initialize first filter visual state
-        document.querySelector('.filter-btn[data-filter="all"]').classList.add('bg-white', 'text-indigo-600', 'shadow-sm');
-
-        // Search Input Handling
+        // Search input & sort listener
         searchInput.addEventListener('input', (e) => {
             searchQuery = e.target.value.toLowerCase().trim();
-            renderTasks();
+            renderApp();
         });
 
-        // Task UI Rendering Loop
-        function renderTasks() {
-            let filtered = tasks.filter(task => {
-                // Filter by Completion State
-                if (currentFilter === 'pending' && task.completed) return false;
-                if (currentFilter === 'completed' && !task.completed) return false;
+        sortSelect.addEventListener('change', (e) => {
+            currentSort = e.target.value;
+            renderApp();
+        });
 
-                // Filter by Search Query
+        function renderApp() {
+            // 1. Calculate Statistics
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.completed).length;
+            const pending = total - completed;
+            const rate = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statPending').textContent = pending;
+            document.getElementById('statCompleted').textContent = completed;
+            document.getElementById('statRate').textContent = `${rate}%`;
+            document.getElementById('statProgressBar').style.width = `${rate}%`;
+
+            // 2. Filter tasks
+            let filtered = tasks.filter(t => {
+                if (currentFilter === 'active' && t.completed) return false;
+                if (currentFilter === 'completed' && !t.completed) return false;
+                
                 if (searchQuery) {
-                    const titleMatch = task.title?.toLowerCase().includes(searchQuery);
-                    const catMatch = task.category?.toLowerCase().includes(searchQuery);
-                    return titleMatch || catMatch;
+                    const matchTitle = (t.title || '').toLowerCase().includes(searchQuery);
+                    const matchCategory = (t.category || '').toLowerCase().includes(searchQuery);
+                    const matchDesc = (t.description || '').toLowerCase().includes(searchQuery);
+                    return matchTitle || matchCategory || matchDesc;
                 }
-
                 return true;
             });
 
+            // 3. Sort tasks (Memory level sorting to avoid Firestore index requirement)
+            filtered.sort((a, b) => {
+                if (currentSort === 'due_asc') {
+                    if (!a.dueDate) return 1;
+                    if (!b.dueDate) return -1;
+                    return a.dueDate.localeCompare(b.dueDate);
+                } else if (currentSort === 'priority_high') {
+                    const pMap = { high: 3, medium: 2, low: 1 };
+                    return (pMap[b.priority] || 2) - (pMap[a.priority] || 2);
+                } else {
+                    // created_desc default
+                    return (b.createdAt || '').localeCompare(a.createdAt || '');
+                }
+            });
+
+            // 4. Render UI
+            taskList.innerHTML = '';
             if (filtered.length === 0) {
-                taskListEl.innerHTML = '';
-                emptyStateEl.classList.remove('hidden');
-                return;
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                filtered.forEach(t => {
+                    taskList.appendChild(createTaskElement(t));
+                });
             }
-
-            emptyStateEl.classList.add('hidden');
-
-            const priorityBadges = {
-                high: '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700">高</span>',
-                medium: '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">中</span>',
-                low: '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">低</span>'
-            };
-
-            taskListEl.innerHTML = filtered.map(task => `
-                <div class="group bg-white p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-200 flex items-center justify-between shadow-sm hover:shadow ${task.completed ? 'bg-slate-50/60 opacity-75' : ''}">
-                    <div class="flex items-center space-x-3 flex-1 min-w-0 mr-3">
-                        <button onclick="toggleTaskComplete('${task.id}', ${task.completed})" class="text-lg transition transform active:scale-90 focus:outline-none">
-                            ${task.completed 
-                                ? '<i class="fa-solid fa-circle-check text-indigo-600"></i>' 
-                                : '<i class="fa-regular fa-circle text-slate-300 hover:text-slate-400"></i>'}
-                        </button>
-                        
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-slate-800 truncate ${task.completed ? 'line-through text-slate-400' : ''}">
-                                ${escapeHtml(task.title)}
-                            </p>
-                            
-                            <div class="flex flex-wrap items-center gap-2 mt-1">
-                                ${priorityBadges[task.priority] || priorityBadges.medium}
-                                
-                                ${task.category ? `
-                                    <span class="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-medium">
-                                        <i class="fa-solid fa-tag mr-1 text-[9px]"></i>${escapeHtml(task.category)}
-                                    </span>
-                                ` : ''}
-
-                                ${task.dueDate ? `
-                                    <span class="text-[10px] text-slate-400 flex items-center">
-                                        <i class="fa-regular fa-calendar mr-1"></i>${task.dueDate}
-                                    </span>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex items-center space-x-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="openEditModal('${task.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" title="編集">
-                            <i class="fa-solid fa-pen text-xs"></i>
-                        </button>
-                        <button onclick="promptDeleteTask('${task.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="削除">
-                            <i class="fa-solid fa-trash-can text-xs"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
         }
 
-        // Utility to prevent XSS
+        function createTaskElement(t) {
+            const card = document.createElement('div');
+            card.className = `bg-white p-4 rounded-2xl border ${t.completed ? 'border-slate-200 bg-slate-50/50 opacity-75' : 'border-slate-200 shadow-sm hover:border-indigo-200'} transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in`;
+
+            const priorityBadge = {
+                high: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200/60">高 🔴</span>',
+                medium: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200/60">中 🟡</span>',
+                low: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200/60">低 🔵</span>'
+            }[t.priority || 'medium'];
+
+            let dueDateHtml = '';
+            if (t.dueDate) {
+                const today = new Date().toISOString().split('T')[0];
+                const isOverdue = t.dueDate < today && !t.completed;
+                dueDateHtml = `
+                    <span class="text-xs font-medium ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-500'} flex items-center gap-1">
+                        <i class="fa-regular fa-calendar-check"></i>
+                        <span>${t.dueDate}</span>
+                        ${isOverdue ? '<span class="text-[10px] bg-rose-100 px-1.5 py-0.2 rounded text-rose-700">期限切れ</span>' : ''}
+                    </span>
+                `;
+            }
+
+            const categoryHtml = t.category 
+                ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-medium"><i class="fa-solid fa-tag text-[9px] mr-1"></i>${escapeHtml(t.category)}</span>` 
+                : '';
+
+            card.innerHTML = `
+                <div class="flex items-start gap-3.5 flex-1 min-w-0">
+                    <button onclick="toggleTaskComplete('${t.id}', ${t.completed})" class="mt-0.5 w-5 h-5 rounded-lg border-2 ${t.completed ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-500'} flex items-center justify-center transition-all flex-shrink-0">
+                        ${t.completed ? '<i class="fa-solid fa-check text-xs"></i>' : ''}
+                    </button>
+                    <div class="space-y-1 min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-sm font-bold ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'} break-words">
+                                ${escapeHtml(t.title)}
+                            </h3>
+                            ${priorityBadge}
+                            ${categoryHtml}
+                        </div>
+                        ${t.description ? `<p class="text-xs text-slate-500 line-clamp-2">${escapeHtml(t.description)}</p>` : ''}
+                        <div class="flex items-center gap-3 pt-0.5">
+                            ${dueDateHtml}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1 self-end sm:self-center">
+                    <button onclick="openEditModal('${t.id}')" class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 flex items-center justify-center transition-colors">
+                        <i class="fa-regular fa-pen-to-square text-xs"></i>
+                    </button>
+                    <button onclick="deleteTask('${t.id}')" class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 flex items-center justify-center transition-colors">
+                        <i class="fa-regular fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `;
+            return card;
+        }
+
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/[&<>"']/g, function(m) {
