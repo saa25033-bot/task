@@ -216,6 +216,34 @@
         </div>
     </div>
 
+    <!-- Auth Error Guidance Modal -->
+    <div id="authErrorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200 px-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100">
+            <div class="flex items-center space-x-3 text-rose-600 mb-4">
+                <div class="p-2.5 bg-rose-100 rounded-xl">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">ログインエラーが発生しました</h3>
+                    <p id="authErrorCode" class="text-xs font-mono text-rose-600 mt-0.5"></p>
+                </div>
+            </div>
+            
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-3 mb-5">
+                <p id="authErrorMessage" class="font-medium text-slate-800"></p>
+                <div id="authErrorSolution" class="space-y-2 pt-2 border-t border-slate-200">
+                    <!-- Dynamic resolution steps -->
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2">
+                <button id="closeAuthErrorBtn" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium transition">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
@@ -310,8 +338,73 @@
                 showToast('ログインしました', 'success');
             } catch (error) {
                 console.error("Login failed:", error);
-                showToast('ログインに失敗しました: ' + error.message, 'error');
+                handleAuthError(error);
             }
+        });
+
+        // Detailed Auth Error Handler
+        function handleAuthError(error) {
+            const modal = document.getElementById('authErrorModal');
+            const codeEl = document.getElementById('authErrorCode');
+            const msgEl = document.getElementById('authErrorMessage');
+            const solutionEl = document.getElementById('authErrorSolution');
+
+            const currentDomain = window.location.hostname || '現在のドメイン';
+            codeEl.textContent = error.code || 'UNKNOWN_ERROR';
+
+            let message = 'Googleログインに失敗しました。';
+            let steps = [];
+
+            switch (error.code) {
+                case 'auth/unauthorized-domain':
+                    message = '現在のドメインがFirebase認証で許可されていません。';
+                    steps = [
+                        `1. <a href="https://console.firebase.google.com/" target="_blank" class="text-indigo-600 underline font-medium">Firebase Console</a> を開く`,
+                        `2. <strong>Authentication</strong> &gt; <strong>設定</strong> &gt; <strong>承認済みドメイン</strong> を開く`,
+                        `3. 「ドメインの追加」をクリックし、 <code class="bg-slate-200 px-1.5 py-0.5 rounded font-mono font-bold text-indigo-700">${currentDomain}</code> を追加してください`
+                    ];
+                    break;
+                case 'auth/operation-not-allowed':
+                    message = 'Google ログインプロバイダが有効になっていません。';
+                    steps = [
+                        `1. <a href="https://console.firebase.google.com/" target="_blank" class="text-indigo-600 underline font-medium">Firebase Console</a> を開く`,
+                        `2. <strong>Authentication</strong> &gt; <strong>Sign-in method</strong> を開く`,
+                        `3. 「Google」を選択して「有効にする」をONにして保存してください`
+                    ];
+                    break;
+                case 'auth/popup-blocked':
+                    message = 'ブラウザでポップアップがブロックされました。';
+                    steps = [
+                        `1. アドレスバー右端のポップアップブロックアイコンを確認`,
+                        `2. 「このサイトのポップアップを常に許可」を選択して再試行してください`
+                    ];
+                    break;
+                case 'auth/popup-closed-by-user':
+                    message = 'ログインウィンドウが途中で閉じられました。';
+                    steps = [`もう一度「Googleでログイン」ボタンを押してログインを完了させてください。`];
+                    break;
+                default:
+                    message = error.message || '予期せぬエラーが発生しました。';
+                    steps = [`設定（API KeyやApp IDなど）が正しいかご確認ください。`];
+                    break;
+            }
+
+            msgEl.textContent = message;
+            solutionEl.innerHTML = `
+                <p class="font-semibold text-slate-800">【解決手順】</p>
+                <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+                    ${steps.map(s => `<li>${s}</li>`).join('')}
+                </ul>
+            `;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        document.getElementById('closeAuthErrorBtn').addEventListener('click', () => {
+            const modal = document.getElementById('authErrorModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
         });
 
         // Logout Event Delegate
